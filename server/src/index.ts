@@ -133,6 +133,7 @@ io.on('connection', (socket) => {
 
   // 断线
   socket.on('disconnect', () => {
+    chatHistory.delete(socket.id);
     if (room.streamer?.id === socket.id) {
       console.log(`🏁 ${nickname} 离开`);
       room.streamer = null;
