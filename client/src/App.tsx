@@ -5,7 +5,35 @@ import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+// TURN 配置（部署时从环境变量读取）
+const TURN_URL = import.meta.env.VITE_TURN_URL || 'turn:43.153.148.187:3478';
+const TURN_USERNAME = import.meta.env.VITE_TURN_USERNAME || 'livestream';
+const TURN_SECRET = import.meta.env.VITE_TURN_SECRET || '';
+
+async function generateTurnCredential(): Promise<{ username: string; credential: string }> {
+  if (!TURN_SECRET) return { username: '', credential: '' };
+  const timestamp = Math.floor(Date.now() / 1000 / 3600) * 3600;
+  const username = `${timestamp}:${TURN_USERNAME}`;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(TURN_SECRET), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(username));
+  const credential = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return { username, credential };
+}
+
+async function buildIceServers(): Promise<RTCIceServer[]> {
+  const servers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (TURN_SECRET) {
+    const cred = await generateTurnCredential();
+    if (cred.username) {
+      servers.push({ urls: TURN_URL, username: cred.username, credential: cred.credential });
+    }
+  }
+  return servers;
+}
 
 export default function App() {
   const [nickname, setNickname] = useState('');
@@ -61,62 +89,74 @@ export default function App() {
   useEffect(() => {
     if (role !== 'viewer' || !socket) return;
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    pcRef.current = pc;
+    let cancelled = false;
+    let pc: RTCPeerConnection | null = null;
 
-    // 连接状态跟踪
-    pc.onconnectionstatechange = () => {
-      setConnectionStatus(pc.connectionState as ConnectionStatus);
-    };
+    (async () => {
+      const iceServers = await buildIceServers();
+      if (cancelled) return;
 
-    // 收到媒体轨道 → 合并到同一个 stream 播放
-    const remoteStreams: MediaStream[] = [];
-    pc.ontrack = (event: RTCTrackEvent) => {
-      let stream = event.streams[0];
-      if (!stream) return;
-      // 合并所有收到的 stream 到一个 combined stream
-      let combined = remoteStreams[0];
-      if (!combined) {
-        combined = new MediaStream();
-        remoteStreams.push(combined);
-      }
-      event.track.addEventListener('ended', () => {
-        combined!.removeTrack(event.track);
+      const localPc = new RTCPeerConnection({ iceServers });
+      pc = localPc;
+      pcRef.current = localPc;
+
+      // 连接状态跟踪
+      localPc.onconnectionstatechange = () => {
+        setConnectionStatus(localPc.connectionState as ConnectionStatus);
+      };
+
+      // 收到媒体轨道 → 合并到同一个 stream 播放
+      const remoteStreams: MediaStream[] = [];
+      localPc.ontrack = (event: RTCTrackEvent) => {
+        let stream = event.streams[0];
+        if (!stream) return;
+        let combined = remoteStreams[0];
+        if (!combined) {
+          combined = new MediaStream();
+          remoteStreams.push(combined);
+        }
+        event.track.addEventListener('ended', () => {
+          combined!.removeTrack(event.track);
+        });
+        combined.addTrack(event.track);
+
+        const video = remoteVideoRef.current;
+        if (video && video.srcObject !== combined) {
+          video.srcObject = combined;
+          video.play().catch(() => {});
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && socket.connected) {
+          socket.emit('rtc:ice-answer', { candidate: event.candidate.toJSON() });
+        }
+      };
+
+      // 收到主播的 offer
+      socket.on('rtc:offer', async (data: { offer: RTCSessionDescriptionInit }) => {
+        if (!pc) return;
+        await pc.setRemoteDescription(data.offer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('rtc:answer', { answer });
       });
-      combined.addTrack(event.track);
 
-      const video = remoteVideoRef.current;
-      if (video && video.srcObject !== combined) {
-        video.srcObject = combined;
-        video.play().catch(() => {});
-      }
-    };
+      // 收到主播的 ICE
+      socket.on('rtc:ice', (data: { candidate: RTCIceCandidateInit }) => {
+        if (pc) pc.addIceCandidate(data.candidate).catch(console.warn);
+      });
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socket.connected) {
-        socket.emit('rtc:ice-answer', { candidate: event.candidate.toJSON() });
-      }
-    };
-
-    // 收到主播的 offer
-    socket.on('rtc:offer', async (data: { offer: RTCSessionDescriptionInit }) => {
-      await pc.setRemoteDescription(data.offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit('rtc:answer', { answer });
-    });
-
-    // 收到主播的 ICE
-    socket.on('rtc:ice', (data: { candidate: RTCIceCandidateInit }) => {
-      pc.addIceCandidate(data.candidate).catch(console.warn);
-    });
-
-    // 通知服务端：我已创建 PC，可以接收 offer
-    socket.emit('viewer:ready');
+      // 通知服务端：我已创建 PC，可以接收 offer
+      socket.emit('viewer:ready');
+    })();
 
     return () => {
-      pc.close();
-      pcRef.current = null;
+      cancelled = true;
+      if (pc) {
+        pc.close();
+        pcRef.current = null;
+      }
       socket.off('rtc:offer');
       socket.off('rtc:ice');
       setConnectionStatus('idle');
@@ -132,7 +172,8 @@ export default function App() {
       const stream = localStreamRef.current;
       if (!stream || peersRef.current.has(viewerId)) return;
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const iceServers = await buildIceServers();
+      const pc = new RTCPeerConnection({ iceServers });
       peersRef.current.set(viewerId, pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
