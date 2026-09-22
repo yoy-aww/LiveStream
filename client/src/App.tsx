@@ -20,6 +20,7 @@ export default function App() {
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   // 观众用
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const streamerReadyRef = useRef(false);
 
   const addToast = useCallback((text: string) => {
     const id = Date.now() + Math.random();
@@ -149,6 +150,10 @@ export default function App() {
   // ── 主播：开始推流 ──
   const startStreaming = useCallback(async () => {
     if (!socket || role !== 'streamer') return;
+    if (streamerReadyRef.current) {
+      addToast('已经在直播中');
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -160,6 +165,7 @@ export default function App() {
       const selfVideo = document.getElementById('selfVideo') as HTMLVideoElement;
       if (selfVideo) selfVideo.srcObject = stream;
 
+      streamerReadyRef.current = true;
       socket.emit('streamer:ready');
       addToast('直播已就绪');
     } catch (err: any) {
@@ -174,6 +180,7 @@ export default function App() {
     peersRef.current.clear();
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    streamerReadyRef.current = false;
     socket.disconnect();
     setSocket(null);
     setRole(null);
