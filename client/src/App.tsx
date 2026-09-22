@@ -47,7 +47,8 @@ export default function App() {
       setRoomState({ streamer: null, viewers: 0, streaming: false });
       addToast('主播已离开');
     });
-    s.on('chat:new', (msg: ChatMessage) => setChatMessages((p) => [...p, msg]));
+    s.on('chat:new', (msg: ChatMessage) => setChatMessages((p) => [...p, msg].slice(-200)));
+    s.on('chat:rateLimited', () => addToast('发送太频繁，请稍候'));
 
     setSocket(s);
   }, [addToast]);
