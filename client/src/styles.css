@@ -175,6 +175,36 @@ body {
   50% { opacity: 0.4; }
 }
 
+.conn-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.conn-connected {
+  background: var(--green);
+  color: white;
+}
+
+.conn-connecting {
+  background: var(--yellow);
+  color: #333;
+}
+
+.conn-failed {
+  background: var(--red);
+  color: white;
+}
+
+.conn-disconnected {
+  background: var(--text-muted);
+  color: white;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
