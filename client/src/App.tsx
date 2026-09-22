@@ -5,6 +5,7 @@ import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
 const SERVER_URL = 'http://localhost:5000';
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 export default function App() {
   const [nickname, setNickname] = useState('');
@@ -14,13 +15,11 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
 
-  // 共享 ref（不触发重渲染）
+  // 主播用
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  // 观众用
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const pendingViewersRef = useRef<Set<string>>(new Set());
-  const streamerReadyRef = useRef(false);
-  const pendingOfferRef = useRef<any>(null); // 观众端：PC 未就绪时的缓冲
 
   const addToast = useCallback((text: string) => {
     const id = Date.now() + Math.random();
@@ -52,17 +51,13 @@ export default function App() {
     setSocket(s);
   }, [addToast]);
 
-  // ── 信令处理：观众端 ──
+  // ── 观众端：创建 PC，等待主播的 offer ──
   useEffect(() => {
     if (role !== 'viewer' || !socket) return;
 
-    // 创建 PC
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
-    // 收到媒体轨道 → 播放
     pc.ontrack = (event) => {
       const video = document.getElementById('remoteVideo') as HTMLVideoElement;
       if (video && video.srcObject !== event.streams[0]) {
@@ -71,72 +66,46 @@ export default function App() {
       }
     };
 
-    // ICE
     pc.onicecandidate = (event) => {
       if (event.candidate && socket.connected) {
         socket.emit('rtc:ice-answer', { candidate: event.candidate });
       }
     };
 
-    // 处理缓冲的 offer（PC 创建前的竞态处理）
-    if (pendingOfferRef.current) {
-      const offer = pendingOfferRef.current;
-      pendingOfferRef.current = null;
-      pc.setRemoteDescription(offer).then(() => {
-        pc.createAnswer().then((answer: any) => {
-          pc.setLocalDescription(answer).then(() => {
-            socket.emit('rtc:answer', { answer });
-          });
-        });
-      });
-    }
-
-    // 通知服务端：已就绪
-    socket.emit('viewer:ready');
-
-    // 收到主播 offer
+    // 收到主播的 offer
     socket.on('rtc:offer', async (data: { offer: any }) => {
-      const myPc = pcRef.current;
-      if (!myPc) {
-        pendingOfferRef.current = data.offer;
-        return;
-      }
-      await myPc.setRemoteDescription(data.offer);
-      const answer = await myPc.createAnswer();
-      await myPc.setLocalDescription(answer);
+      await pc.setRemoteDescription(data.offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
       socket.emit('rtc:answer', { answer });
     });
 
-    // 收到主播 ICE
+    // 收到主播的 ICE
     socket.on('rtc:ice', (data: { candidate: any }) => {
-      if (pcRef.current) pcRef.current.addIceCandidate(data.candidate).catch(console.warn);
+      pc.addIceCandidate(data.candidate).catch(console.warn);
     });
+
+    // 通知服务端：我已创建 PC，可以接收 offer
+    socket.emit('viewer:ready');
 
     return () => {
       pc.close();
       pcRef.current = null;
-      pendingOfferRef.current = null;
       socket.off('rtc:offer');
       socket.off('rtc:ice');
     };
   }, [role, socket]);
 
-  // ── 信令处理：主播端 ──
+  // ── 主播端：处理信令 ──
   useEffect(() => {
     if (role !== 'streamer' || !socket) return;
 
-    // 为某个观众创建 PC 并发送 offer
-    const createPeerForViewer = async (viewerId: string) => {
+    // 收到观众加入 → 创建 PC 并发送 offer
+    socket.on('viewer:join', async (viewerId: string) => {
       const stream = localStreamRef.current;
-      if (!stream) {
-        pendingViewersRef.current.add(viewerId);
-        return;
-      }
-      if (peersRef.current.has(viewerId)) return;
+      if (!stream || peersRef.current.has(viewerId)) return;
 
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-      });
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       peersRef.current.set(viewerId, pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
@@ -149,15 +118,6 @@ export default function App() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('rtc:offer', { viewerId, offer });
-    };
-
-    // 收到观众加入
-    socket.on('viewer:join', (viewerId: string) => {
-      if (!streamerReadyRef.current || !localStreamRef.current) {
-        pendingViewersRef.current.add(viewerId);
-        return;
-      }
-      createPeerForViewer(viewerId);
     });
 
     // 收到观众 answer
@@ -176,7 +136,6 @@ export default function App() {
     socket.on('viewer:leave', (viewerId: string) => {
       const pc = peersRef.current.get(viewerId);
       if (pc) { pc.close(); peersRef.current.delete(viewerId); }
-      pendingViewersRef.current.delete(viewerId);
     });
 
     return () => {
@@ -189,7 +148,7 @@ export default function App() {
 
   // ── 主播：开始推流 ──
   const startStreaming = useCallback(async () => {
-    if (!socket || role !== 'streamer' || streamerReadyRef.current) return;
+    if (!socket || role !== 'streamer') return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -198,38 +157,11 @@ export default function App() {
       });
       localStreamRef.current = stream;
 
-      // 显示本地预览
       const selfVideo = document.getElementById('selfVideo') as HTMLVideoElement;
       if (selfVideo) selfVideo.srcObject = stream;
 
-      streamerReadyRef.current = true;
       socket.emit('streamer:ready');
       addToast('直播已就绪');
-
-      // 为已缓冲的观众建连
-      const pending = Array.from(pendingViewersRef.current);
-      pendingViewersRef.current.clear();
-      for (const vid of pending) {
-        // 延迟一点，确保信令监听器已就绪
-        setTimeout(() => {
-          socket.emit('viewer:join', { viewerId: vid, from: 'pending' });
-          // 实际上服务端会再次发送 viewer:join
-          // 我们直接在这里建连
-          const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-          peersRef.current.set(vid, pc);
-          stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-          pc.onicecandidate = (e) => {
-            if (e.candidate && socket.connected) {
-              socket.emit('rtc:ice', { viewerId: vid, candidate: e.candidate });
-            }
-          };
-          pc.createOffer().then((offer) => {
-            pc.setLocalDescription(offer).then(() => {
-              socket.emit('rtc:offer', { viewerId: vid, offer });
-            });
-          });
-        }, 100);
-      }
     } catch (err: any) {
       addToast(`无法访问摄像头/麦克风: ${err.message}`);
     }
@@ -240,10 +172,8 @@ export default function App() {
     if (!socket || role !== 'streamer') return;
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
-    pendingViewersRef.current.clear();
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
-    streamerReadyRef.current = false;
     socket.disconnect();
     setSocket(null);
     setRole(null);
