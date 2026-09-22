@@ -32,9 +32,12 @@ interface Room {
 const room: Room = { streamer: null, viewers: new Map(), readyViewers: new Set() };
 
 io.use((socket, next) => {
-  const nickname = socket.handshake.auth?.nickname as string | undefined;
-  if (!nickname || !nickname.trim()) return next(new Error('缺少昵称'));
-  socket.data.nickname = nickname.trim();
+  const raw = socket.handshake.auth?.nickname as string | undefined;
+  if (!raw || !raw.trim()) return next(new Error('缺少昵称'));
+  // 只允许中文、字母、数字、下划线、连字符，1-16 字符
+  const sanitized = raw.trim().slice(0, 16).replace(/[^\u4e00-\u9fa5a-zA-Z0-9_-]/g, '');
+  if (!sanitized) return next(new Error('昵称无效'));
+  socket.data.nickname = sanitized;
   next();
 });
 
