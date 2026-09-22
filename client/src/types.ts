@@ -13,3 +13,21 @@ export interface RoomState {
 }
 
 export type Role = 'streamer' | 'viewer' | null;
+export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'failed' | 'disconnected';
+
+// ── WebRTC 信令类型 ──
+export interface OfferPayload {
+  viewerId: string;
+  offer: RTCSessionDescriptionInit;
+}
+export interface AnswerPayload {
+  viewerId: string;
+  answer: RTCSessionDescriptionInit;
+}
+export interface IceCandidatePayload {
+  viewerId: string;
+  candidate: RTCIceCandidateInit;
+}
+export interface IceAnswerPayload {
+  candidate: RTCIceCandidateInit;
+}
