@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { ChatMessage, RoomState, Role, OfferPayload, AnswerPayload, IceCandidatePayload, IceAnswerPayload } from './types';
+import type { ChatMessage, RoomState, Role, ConnectionStatus, AnswerPayload, IceAnswerPayload } from './types';
 import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
@@ -14,6 +14,7 @@ export default function App() {
   const [roomState, setRoomState] = useState<RoomState>({ streamer: null, viewers: 0, streaming: false });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
 
   // 主播用
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -36,20 +37,21 @@ export default function App() {
 
     s.on('connect', () => { addToast('已连接服务器'); s.emit('room:enter'); });
     s.on('connect_error', (err) => addToast(`连接失败: ${err.message}`));
-    s.on('room:assigned', (d: any) => {
+    s.on('room:assigned', (d: { role: Role; nickname: string; streamerNickname: string }) => {
       setRole(d.role);
       if (d.role === 'streamer') addToast('你已成为主播！');
       else addToast(`正在观看 ${d.streamerNickname}`);
     });
     s.on('room:state', (st: RoomState) => setRoomState(st));
-    s.on('viewer:joined', (d: any) => addToast(`${d.nickname} 加入`));
-    s.on('viewer:left', (d: any) => addToast(`${d.nickname} 离开`));
+    s.on('viewer:joined', (d: { nickname: string }) => addToast(`${d.nickname} 加入了房间`));
+    s.on('viewer:left', (d: { nickname: string }) => addToast(`${d.nickname} 离开了房间`));
     s.on('streamer:left', () => {
       setRole(null); setSocket(null);
       setRoomState({ streamer: null, viewers: 0, streaming: false });
+      setConnectionStatus('idle');
       addToast('主播已离开');
     });
-    s.on('chat:new', (msg: ChatMessage) => setChatMessages((p) => [...p, msg].slice(-200)));
+    s.on('chat:new', (msg: ChatMessage) => setChatMessages((prev) => [...prev, msg].slice(-200)));
     s.on('chat:rateLimited', () => addToast('发送太频繁，请稍候'));
 
     setSocket(s);
@@ -61,6 +63,11 @@ export default function App() {
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
+
+    // 连接状态跟踪
+    pc.onconnectionstatechange = () => {
+      setConnectionStatus(pc.connectionState as ConnectionStatus);
+    };
 
     // 收到媒体轨道 → 合并到同一个 stream 播放
     const remoteStreams: MediaStream[] = [];
@@ -78,7 +85,7 @@ export default function App() {
       });
       combined.addTrack(event.track);
 
-      const video = document.getElementById('remoteVideo') as HTMLVideoElement;
+      const video = remoteVideoRef.current;
       if (video && video.srcObject !== combined) {
         video.srcObject = combined;
         video.play().catch(() => {});
@@ -112,6 +119,7 @@ export default function App() {
       pcRef.current = null;
       socket.off('rtc:offer');
       socket.off('rtc:ice');
+      setConnectionStatus('idle');
     };
   }, [role, socket]);
 
@@ -127,6 +135,16 @@ export default function App() {
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       peersRef.current.set(viewerId, pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+      // 跟踪每个 peer 的连接状态
+      pc.onconnectionstatechange = () => {
+        const states = Array.from(peersRef.current.values()).map(p => p.connectionState);
+        if (states.length === 0) setConnectionStatus('idle');
+        else if (states.every(s => s === 'connected')) setConnectionStatus('connected');
+        else if (states.some(s => s === 'connected')) setConnectionStatus('connected');
+        else if (states.some(s => s === 'failed' || s === 'disconnected')) setConnectionStatus('failed');
+        else setConnectionStatus('connecting');
+      };
 
       pc.onicecandidate = (e) => {
         if (e.candidate && socket.connected) {
@@ -162,6 +180,7 @@ export default function App() {
       socket.off('rtc:answer');
       socket.off('rtc:ice-answer');
       socket.off('viewer:leave');
+      setConnectionStatus('idle');
     };
   }, [role, socket]);
 
@@ -180,14 +199,13 @@ export default function App() {
       });
       localStreamRef.current = stream;
 
-      const selfVideo = document.getElementById('selfVideo') as HTMLVideoElement;
-      if (selfVideo) selfVideo.srcObject = stream;
+      if (selfVideoRef.current) selfVideoRef.current.srcObject = stream;
 
       streamerReadyRef.current = true;
       socket.emit('streamer:ready');
       addToast('直播已就绪');
-    } catch (err: any) {
-      addToast(`无法访问摄像头/麦克风: ${err.message}`);
+    } catch (err) {
+      addToast(`无法访问摄像头/麦克风: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [socket, role, addToast]);
 
@@ -199,6 +217,7 @@ export default function App() {
     if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     streamerReadyRef.current = false;
+    setConnectionStatus('idle');
     socket.disconnect();
     setSocket(null);
     setRole(null);
@@ -221,6 +240,8 @@ export default function App() {
     <LiveRoom
       socket={socket} role={role} roomState={roomState} nickname={nickname}
       chatMessages={chatMessages} toasts={toasts}
+      connectionStatus={connectionStatus}
+      selfVideoRef={selfVideoRef} remoteVideoRef={remoteVideoRef}
       onSendChat={sendChat} onSendImage={sendImage}
       onStartStreaming={startStreaming} onStopStreaming={stopStreaming}
     />

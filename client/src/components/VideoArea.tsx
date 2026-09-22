@@ -1,60 +1,45 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Role } from '../types';
+import { useState, useEffect } from 'react';
+import type { RefObject } from 'react';
+import type { Role, ConnectionStatus } from '../types';
 
 interface Props {
   role: Role;
+  connectionStatus: ConnectionStatus;
+  selfVideoRef: RefObject<HTMLVideoElement>;
+  remoteVideoRef: RefObject<HTMLVideoElement>;
 }
 
-export default function VideoArea({ role }: Props) {
+export default function VideoArea({ role, connectionStatus, selfVideoRef, remoteVideoRef }: Props) {
   const [hasStream, setHasStream] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const selfVideoRef = useRef<HTMLVideoElement>(null);
 
-  // 主播端：检测 selfVideo.srcObject 是否被外部设置（由 App 的 startStreaming 设置）
+  // 挂载时检查是否已有流 + 后续监听 loadedmetadata
   useEffect(() => {
-    if (role !== 'streamer') return;
-    const video = selfVideoRef.current;
+    const video = role === 'viewer' ? remoteVideoRef.current : selfVideoRef.current;
     if (!video) return;
 
-    let timer: ReturnType<typeof setInterval>;
-    const check = () => {
-      if (video.srcObject) {
-        setHasStream(true);
-        clearInterval(timer);
-      }
-    };
-    timer = setInterval(check, 200);
-    check();
+    if (video.srcObject) setHasStream(true);
 
-    return () => clearInterval(timer);
-  }, [role]);
+    const onLoaded = () => setHasStream(true);
+    video.addEventListener('loadedmetadata', onLoaded);
+    return () => video.removeEventListener('loadedmetadata', onLoaded);
+  }, [role, selfVideoRef, remoteVideoRef]);
 
-  // 观众端：检测 remoteVideo.srcObject
-  useEffect(() => {
-    if (role !== 'viewer') return;
-    const video = videoRef.current;
-    if (!video) return;
-
-    let timer: ReturnType<typeof setInterval>;
-    const check = () => {
-      if (video.srcObject) {
-        setHasStream(true);
-        clearInterval(timer);
-      }
-    };
-    timer = setInterval(check, 200);
-    check();
-
-    return () => clearInterval(timer);
-  }, [role]);
+  // 观众端等待文案根据连接状态变化
+  const waitingText = connectionStatus === 'connected'
+    ? '正在等待主播开播...'
+    : connectionStatus === 'connecting'
+      ? '正在连接...'
+      : connectionStatus === 'failed'
+        ? '连接失败，请重试'
+        : '正在连接...';
 
   if (role === 'viewer') {
     return (
       <div className="video-area">
-        <video ref={videoRef} id="remoteVideo" className="video-main" autoPlay playsInline />
+        <video ref={remoteVideoRef} className="video-main" autoPlay playsInline />
         <div className={`video-placeholder ${hasStream ? 'hidden' : ''}`}>
           <div className="icon">📡</div>
-          <p>{hasStream ? '' : '正在等待主播开播...'}</p>
+          <p>{hasStream ? '' : waitingText}</p>
         </div>
       </div>
     );
@@ -70,7 +55,7 @@ export default function VideoArea({ role }: Props) {
         </div>
       )}
       <div className="video-self">
-        <video ref={selfVideoRef} id="selfVideo" autoPlay playsInline muted />
+        <video ref={selfVideoRef} autoPlay playsInline muted />
       </div>
     </div>
   );
