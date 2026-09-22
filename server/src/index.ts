@@ -11,6 +11,11 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5174')
   .split(',')
   .map(s => s.trim());
 
+// TURN 服务器配置（部署时填写，当前仅 STUN）
+// const TURN_CONFIG = process.env.TURN_URL
+//   ? { urls: process.env.TURN_URL, username: process.env.TURN_USERNAME, credential: process.env.TURN_CREDENTIAL }
+//   : undefined;
+
 const io = new Server(server, {
   cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] },
 });
