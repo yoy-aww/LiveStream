@@ -59,10 +59,25 @@ export default function App() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
-    pc.ontrack = (event) => {
+    // 收到媒体轨道 → 合并到同一个 stream 播放
+    const remoteStreams: MediaStream[] = [];
+    pc.ontrack = (event: RTCTrackEvent) => {
+      let stream = event.streams[0];
+      if (!stream) return;
+      // 合并所有收到的 stream 到一个 combined stream
+      let combined = remoteStreams[0];
+      if (!combined) {
+        combined = new MediaStream();
+        remoteStreams.push(combined);
+      }
+      event.track.addEventListener('ended', () => {
+        combined!.removeTrack(event.track);
+      });
+      combined.addTrack(event.track);
+
       const video = document.getElementById('remoteVideo') as HTMLVideoElement;
-      if (video && video.srcObject !== event.streams[0]) {
-        video.srcObject = event.streams[0];
+      if (video && video.srcObject !== combined) {
+        video.srcObject = combined;
         video.play().catch(() => {});
       }
     };
