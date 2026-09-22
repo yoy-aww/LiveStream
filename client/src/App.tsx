@@ -18,8 +18,10 @@ export default function App() {
   // 主播用
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const selfVideoRef = useRef<HTMLVideoElement>(null);
   // 观众用
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const streamerReadyRef = useRef(false);
 
   const addToast = useCallback((text: string) => {
