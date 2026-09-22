@@ -31,6 +31,11 @@ interface Room {
 }
 const room: Room = { streamer: null, viewers: new Map(), readyViewers: new Set() };
 
+// 聊天频率限制：每个 socket 3 秒内最多 10 条
+const RATE_LIMIT_WINDOW = 3000;
+const RATE_LIMIT_MAX = 10;
+const chatHistory = new Map<string, number[]>();
+
 io.use((socket, next) => {
   const raw = socket.handshake.auth?.nickname as string | undefined;
   if (!raw || !raw.trim()) return next(new Error('缺少昵称'));
@@ -89,6 +94,14 @@ io.on('connection', (socket) => {
 
   // 聊天
   socket.on('chat:send', (data: { type: 'text' | 'image'; content: string }) => {
+    const now = Date.now();
+    let history = chatHistory.get(socket.id) || [];
+    history = history.filter(t => now - t < RATE_LIMIT_WINDOW);
+    if (history.length >= RATE_LIMIT_MAX) {
+      return socket.emit('chat:rateLimited');
+    }
+    history.push(now);
+    chatHistory.set(socket.id, history);
     io.emit('chat:new', {
       id: socket.id, nickname,
       type: data.type, content: data.content,
