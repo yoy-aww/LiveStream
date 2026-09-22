@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { ChatMessage, RoomState, Role } from './types';
+import type { ChatMessage, RoomState, Role, OfferPayload, AnswerPayload, IceCandidatePayload, IceAnswerPayload } from './types';
 import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
@@ -85,12 +85,12 @@ export default function App() {
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket.connected) {
-        socket.emit('rtc:ice-answer', { candidate: event.candidate });
+        socket.emit('rtc:ice-answer', { candidate: event.candidate.toJSON() });
       }
     };
 
     // 收到主播的 offer
-    socket.on('rtc:offer', async (data: { offer: any }) => {
+    socket.on('rtc:offer', async (data: { offer: RTCSessionDescriptionInit }) => {
       await pc.setRemoteDescription(data.offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -98,7 +98,7 @@ export default function App() {
     });
 
     // 收到主播的 ICE
-    socket.on('rtc:ice', (data: { candidate: any }) => {
+    socket.on('rtc:ice', (data: { candidate: RTCIceCandidateInit }) => {
       pc.addIceCandidate(data.candidate).catch(console.warn);
     });
 
@@ -128,7 +128,7 @@ export default function App() {
 
       pc.onicecandidate = (e) => {
         if (e.candidate && socket.connected) {
-          socket.emit('rtc:ice', { viewerId, candidate: e.candidate });
+          socket.emit('rtc:ice', { viewerId, candidate: e.candidate.toJSON() });
         }
       };
 
@@ -138,13 +138,13 @@ export default function App() {
     });
 
     // 收到观众 answer
-    socket.on('rtc:answer', (data: { answer: any; viewerId: string }) => {
+    socket.on('rtc:answer', (data: AnswerPayload) => {
       const pc = peersRef.current.get(data.viewerId);
       if (pc) pc.setRemoteDescription(data.answer);
     });
 
     // 收到观众 ICE
-    socket.on('rtc:ice-answer', (data: { candidate: any; viewerId: string }) => {
+    socket.on('rtc:ice-answer', (data: IceAnswerPayload & { viewerId: string }) => {
       const pc = peersRef.current.get(data.viewerId);
       if (pc) pc.addIceCandidate(data.candidate).catch(console.warn);
     });
