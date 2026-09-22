@@ -4,8 +4,8 @@ import type { ChatMessage, RoomState, Role, OfferPayload, AnswerPayload, IceCand
 import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
-const SERVER_URL = 'http://localhost:5000';
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 export default function App() {
   const [nickname, setNickname] = useState('');
