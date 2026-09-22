@@ -26,6 +26,11 @@ export default function ChatPanel({ messages, onSendChat, onSendImage }: Props) 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 200 * 1024) {
+      alert('图片超过 200KB，请压缩后发送');
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => onSendImage(reader.result as string);
     reader.readAsDataURL(file);
