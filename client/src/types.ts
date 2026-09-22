@@ -12,9 +12,4 @@ export interface RoomState {
   streaming: boolean;
 }
 
-export interface PeerInfo {
-  id: string;
-  nickname: string;
-}
-
 export type Role = 'streamer' | 'viewer' | null;
