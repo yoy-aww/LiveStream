@@ -5,11 +5,17 @@ import { Server } from 'socket.io';
 
 const app = express();
 const server = http.createServer(app);
+
+// 允许的跨域来源
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5174')
+  .split(',')
+  .map(s => s.trim());
+
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] },
 });
 
-app.use(cors());
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.get('/api/room', (_req, res) => {
   res.json({
     streamer: room.streamer ? { nickname: room.streamer.nickname } : null,
