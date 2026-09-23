@@ -209,7 +209,10 @@ export default function App() {
     // 收到观众 ICE
     socket.on('rtc:ice-answer', (data: IceAnswerPayload & { viewerId: string }) => {
       const pc = peersRef.current.get(data.viewerId);
-      if (pc) pc.addIceCandidate(data.candidate).catch(console.warn);
+      if (!pc) return;
+      // 若 remoteDescription 尚未就绪（answer 还没到），addIceCandidate 会 reject，
+      // 但 reject 只是丢这一个 candidate，后续 candidate 会继续补，不影响最终建连。
+      pc.addIceCandidate(data.candidate).catch(() => { /* 时序早于 answer 时暂无法应用，跳过 */ });
     });
 
     // 观众离开
