@@ -11,20 +11,39 @@ interface Props {
 
 export default function VideoArea({ role, connectionStatus, selfVideoRef, remoteVideoRef }: Props) {
   const [hasStream, setHasStream] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
 
-  // 挂载时检查是否已有流 + 后续监听 loadedmetadata
   useEffect(() => {
     const video = role === 'viewer' ? remoteVideoRef.current : selfVideoRef.current;
     if (!video) return;
 
+    const onLoaded = () => setHasStream(true);
+    const onPlay = () => setHasStream(true);
+    const onStalled = () => setNeedsUnlock(true);
+
     if (video.srcObject) setHasStream(true);
 
-    const onLoaded = () => setHasStream(true);
     video.addEventListener('loadedmetadata', onLoaded);
-    return () => video.removeEventListener('loadedmetadata', onLoaded);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('stalled', onStalled);
+    return () => {
+      video.removeEventListener('loadedmetadata', onLoaded);
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('stalled', onStalled);
+    };
   }, [role, selfVideoRef, remoteVideoRef]);
 
-  // 观众端等待文案根据连接状态变化
+  // 观众点击视频区域 → 解锁音频
+  const handleClick = () => {
+    if (role !== 'viewer') return;
+    const video = remoteVideoRef.current;
+    if (!video) return;
+    video.play().then(() => {
+      setNeedsUnlock(false);
+      setHasStream(true);
+    }).catch(() => setNeedsUnlock(true));
+  };
+
   const waitingText = connectionStatus === 'connected'
     ? '正在等待主播开播...'
     : connectionStatus === 'connecting'
@@ -35,12 +54,19 @@ export default function VideoArea({ role, connectionStatus, selfVideoRef, remote
 
   if (role === 'viewer') {
     return (
-      <div className="video-area">
+      <div className="video-area" onClick={handleClick}>
         <video ref={remoteVideoRef} className="video-main" autoPlay playsInline />
         <div className={`video-placeholder ${hasStream ? 'hidden' : ''}`}>
           <div className="icon">📡</div>
-          <p>{hasStream ? '' : waitingText}</p>
+          <p>{waitingText}</p>
         </div>
+        {needsUnlock && hasStream && (
+          <div className="audio-unlock">
+            <button className="audio-unlock-btn" onClick={(e) => { e.stopPropagation(); handleClick(); }}>
+              🔊 点击开启声音
+            </button>
+          </div>
+        )}
       </div>
     );
   }
