@@ -802,9 +802,8 @@ body {
   .chat-panel.collapsed {
     width: 100%;
     height: auto;
-    justify-content: flex-start;
-    align-items: flex-start;
-    padding: 4px 8px;
+    padding: 0;
+    border-top: 1px solid var(--border);
   }
 
   .chat-toggle-bar {
@@ -813,8 +812,12 @@ body {
     flex-direction: row;
     width: 100%;
     padding: 8px 12px;
-    justify-content: space-between;
-    gap: 4px;
+    justify-content: flex-start;
+    gap: 8px;
+    border: none;
+    border-radius: 0;
+    background: var(--surface);
+    height: 40px;
   }
 
   .chat-toggle-icon {

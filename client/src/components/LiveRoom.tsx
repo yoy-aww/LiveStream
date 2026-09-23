@@ -24,7 +24,9 @@ interface Props {
 }
 
 export default function LiveRoom(props: Props) {
-  const [chatCollapsed, setChatCollapsed] = useState(false);
+  // 手机端默认折叠聊天，让视频区域占满
+  const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+  const [chatCollapsed, setChatCollapsed] = useState(isMobile);
 
   return (
     <div className="live-room">

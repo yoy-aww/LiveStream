@@ -7,24 +7,16 @@ interface Props {
 }
 
 export default function ControlBar({ role, onStartStreaming, onStopStreaming }: Props) {
-  if (role === 'streamer') {
-    return (
-      <div className="control-bar">
-        <button className="ctrl-btn active" onClick={onStartStreaming}>
-          <span className="icon">▶️</span> 开始直播
-        </button>
-        <button className="ctrl-btn danger" onClick={onStopStreaming}>
-          <span className="icon">⏹</span> 停止直播
-        </button>
-      </div>
-    );
-  }
+  if (role !== 'streamer') return null;
 
   return (
     <div className="control-bar">
-      <span className="ctrl-btn" style={{ cursor: 'default' }}>
-        <span className="icon">👁</span> 观看中
-      </span>
+      <button className="ctrl-btn active" onClick={onStartStreaming}>
+        <span className="icon">▶️</span> 开始直播
+      </button>
+      <button className="ctrl-btn danger" onClick={onStopStreaming}>
+        <span className="icon">⏹</span> 停止直播
+      </button>
     </div>
   );
 }
