@@ -37,7 +37,7 @@ export default function LiveRoom(props: Props) {
       <div className="main-area">
         <Topbar role={props.role} roomState={props.roomState} nickname={props.nickname} connectionStatus={props.connectionStatus} />
         <VideoArea role={props.role} connectionStatus={props.connectionStatus} selfVideoRef={props.selfVideoRef} remoteVideoRef={props.remoteVideoRef} messages={props.chatMessages} />
-        <ControlBar role={props.role} onStartStreaming={props.onStartStreaming} onStopStreaming={props.onStopStreaming} />
+        <ControlBar role={props.role} onStartStreaming={props.onStartStreaming} onStopStreaming={props.onStopStreaming} remoteVideoRef={props.remoteVideoRef} />
       </div>
       <ChatPanel
         messages={props.chatMessages}
