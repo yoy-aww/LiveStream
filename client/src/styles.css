@@ -9,7 +9,10 @@
   --text-muted: #8888a0;
   --green: #10b981;
   --red: #ef4444;
+  --yellow: #f59e0b;
   --radius: 12px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -24,6 +27,8 @@ body {
   color: var(--text);
   min-height: 100vh;
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
@@ -37,6 +42,7 @@ body {
   justify-content: center;
   min-height: 100vh;
   background: linear-gradient(135deg, var(--bg) 0%, #1a1a2e 100%);
+  padding: 16px;
 }
 
 .login-card {
@@ -44,7 +50,8 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 48px 40px;
-  width: 420px;
+  width: 100%;
+  max-width: 420px;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
@@ -76,7 +83,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px; /* 防止 iOS 自动放大 */
   outline: none;
   transition: border-color 0.2s;
   margin-bottom: 16px;
@@ -101,6 +108,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
+  min-height: 44px; /* 触摸友好 */
 }
 
 .login-btn:hover {
@@ -121,6 +129,7 @@ body {
 .live-room {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* 移动端动态视口 */
 }
 
 .main-area {
@@ -128,6 +137,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* ── 顶部栏 ── */
@@ -136,19 +146,24 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
+  padding-top: calc(12px + var(--safe-top));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .topbar-logo {
   font-size: 20px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .live-badge {
@@ -160,6 +175,7 @@ body {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .live-badge .dot {
@@ -183,6 +199,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .conn-connected {
@@ -209,6 +226,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .viewer-count {
@@ -220,6 +238,7 @@ body {
   border-radius: 8px;
   font-size: 13px;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .viewer-count span {
@@ -260,6 +279,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  min-height: 0;
 }
 
 .video-main {
@@ -323,8 +343,10 @@ body {
   justify-content: center;
   gap: 16px;
   padding: 16px 20px;
+  padding-bottom: calc(16px + var(--safe-bottom));
   background: var(--surface);
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .ctrl-btn {
@@ -339,6 +361,7 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px; /* 触摸友好 */
 }
 
 .ctrl-btn:hover {
@@ -372,6 +395,7 @@ body {
   flex-direction: column;
   background: var(--surface);
   border-left: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .chat-header {
@@ -391,6 +415,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -459,8 +484,9 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-  font-size: 13px;
+  font-size: 16px; /* 防止 iOS 自动放大 */
   outline: none;
+  min-width: 0;
 }
 
 .chat-input:focus {
@@ -481,6 +507,8 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
+  min-height: 44px;
+  flex-shrink: 0;
 }
 
 .send-btn:hover {
@@ -496,17 +524,19 @@ body {
   font-size: 16px;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-.img-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* ── 通知提示 ── */
 .toast-container {
   position: fixed;
   top: 20px;
+  top: calc(20px + var(--safe-top));
   right: 20px;
   z-index: 1000;
   display: flex;
@@ -581,4 +611,204 @@ body {
 
 .connection-status.connecting {
   color: #f59e0b;
+}
+
+/* ══════════════════════════════════════════ */
+/* ── 移动端响应式 ── */
+/* ══════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* 直播间改为纵向布局 */
+  .live-room {
+    flex-direction: column;
+  }
+
+  .main-area {
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* 顶栏精简 */
+  .topbar {
+    padding: 8px 12px;
+    padding-top: calc(8px + var(--safe-top));
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .topbar-logo {
+    font-size: 16px;
+  }
+
+  .live-badge,
+  .conn-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+
+  .topbar-right {
+    gap: 8px;
+  }
+
+  .viewer-count {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .my-info {
+    gap: 6px;
+  }
+
+  .my-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .my-name {
+    font-size: 12px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 视频区域自适应 */
+  .video-area {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .video-self {
+    width: 100px;
+    height: 75px;
+    bottom: 12px;
+    right: 12px;
+    border-radius: 6px;
+    border-width: 1px;
+  }
+
+  .video-placeholder {
+    font-size: 14px;
+  }
+
+  .video-placeholder .icon {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+
+  /* 控制面板紧凑 */
+  .control-bar {
+    padding: 8px 12px;
+    padding-bottom: calc(8px + var(--safe-bottom));
+    gap: 10px;
+  }
+
+  .ctrl-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+
+  .ctrl-btn .icon {
+    font-size: 16px;
+  }
+
+  /* 聊天面板改为底部抽屉 */
+  .chat-panel {
+    width: 100%;
+    height: 40vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .chat-header {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .chat-messages {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .chat-msg {
+    font-size: 12px;
+  }
+
+  .chat-msg-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .chat-msg-name {
+    font-size: 11px;
+  }
+
+  .chat-msg-img {
+    max-width: 120px;
+    max-height: 90px;
+  }
+
+  .chat-input-area {
+    padding: 8px;
+  }
+
+  .chat-input {
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+
+  .send-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .img-btn {
+    padding: 8px 10px;
+    font-size: 14px;
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* 通知提示适配 */
+  .toast-container {
+    top: calc(12px + var(--safe-top));
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+
+  .toast {
+    max-width: none;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+}
+
+/* ── 窄屏手机（≤375px）── */
+@media (max-width: 375px) {
+  .topbar-logo {
+    font-size: 14px;
+  }
+
+  .my-name {
+    display: none; /* 空间不够时隐藏昵称 */
+  }
+
+  .chat-panel {
+    height: 35vh;
+  }
+
+  .video-self {
+    width: 80px;
+    height: 60px;
+    bottom: 8px;
+    right: 8px;
+  }
 }
