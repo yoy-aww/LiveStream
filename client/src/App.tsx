@@ -4,7 +4,9 @@ import type { ChatMessage, RoomState, Role, ConnectionStatus, AnswerPayload, Ice
 import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+// 跟随页面入口连接：若构建时用 VITE_SERVER_URL 显式指定了地址则优先使用（例如本地开发指向 localhost:5000）；
+// 否则跟随当前页面的 origin，由 nginx 反代到 5000，浏览器无需感知端口/域名差异
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 // TURN 配置（部署时从环境变量读取）
 const TURN_URL = import.meta.env.VITE_TURN_URL || 'turn:43.153.148.187:3478';
@@ -230,6 +232,16 @@ export default function App() {
     if (!socket || role !== 'streamer') return;
     if (streamerReadyRef.current) {
       addToast('已经在直播中');
+      return;
+    }
+
+    // 安全上下文检查：getUserMedia 仅 https:// 或 localhost 下可用
+    if (!window.isSecureContext) {
+      addToast('需要 HTTPS 环境，请通过 https:// 域名访问');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      addToast('浏览器不支持或未授权摄像头/麦克风');
       return;
     }
 
