@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import type { RefObject } from 'react';
-import type { Role, ConnectionStatus } from '../types';
+import type { Role, ConnectionStatus, ChatMessage } from '../types';
+import Danmaku from './Danmaku';
 
 interface Props {
   role: Role;
   connectionStatus: ConnectionStatus;
   selfVideoRef: RefObject<HTMLVideoElement>;
   remoteVideoRef: RefObject<HTMLVideoElement>;
+  messages: ChatMessage[];
 }
 
-export default function VideoArea({ role, connectionStatus, selfVideoRef, remoteVideoRef }: Props) {
+export default function VideoArea({ role, connectionStatus, selfVideoRef, remoteVideoRef, messages }: Props) {
   const [hasStream, setHasStream] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
 
@@ -19,17 +21,14 @@ export default function VideoArea({ role, connectionStatus, selfVideoRef, remote
 
     const onLoaded = () => setHasStream(true);
     const onPlay = () => setHasStream(true);
-    const onStalled = () => setNeedsUnlock(true);
 
     if (video.srcObject) setHasStream(true);
 
     video.addEventListener('loadedmetadata', onLoaded);
     video.addEventListener('play', onPlay);
-    video.addEventListener('stalled', onStalled);
     return () => {
       video.removeEventListener('loadedmetadata', onLoaded);
       video.removeEventListener('play', onPlay);
-      video.removeEventListener('stalled', onStalled);
     };
   }, [role, selfVideoRef, remoteVideoRef]);
 
@@ -60,11 +59,10 @@ export default function VideoArea({ role, connectionStatus, selfVideoRef, remote
           <div className="icon">📡</div>
           <p>{waitingText}</p>
         </div>
+        <Danmaku messages={messages} />
         {needsUnlock && hasStream && (
-          <div className="audio-unlock">
-            <button className="audio-unlock-btn" onClick={(e) => { e.stopPropagation(); handleClick(); }}>
-              🔊 点击开启声音
-            </button>
+          <div className="audio-unlock" onClick={(e) => { e.stopPropagation(); handleClick(); }}>
+            <button className="audio-unlock-btn">🔊 点击开启声音</button>
           </div>
         )}
       </div>
@@ -83,6 +81,7 @@ export default function VideoArea({ role, connectionStatus, selfVideoRef, remote
       <div className="video-self">
         <video ref={selfVideoRef} autoPlay playsInline muted />
       </div>
+      <Danmaku messages={messages} />
     </div>
   );
 }

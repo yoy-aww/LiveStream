@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import type { ChatMessage, RoomState, Role, ConnectionStatus } from '../types';
 import Topbar from './Topbar';
 import VideoArea from './VideoArea';
+import Danmaku from './Danmaku';
 import ChatPanel from './ChatPanel';
 import ControlBar from './ControlBar';
 import ToastContainer from './ToastContainer';
@@ -32,7 +33,7 @@ export default function LiveRoom(props: Props) {
     <div className="live-room">
       <div className="main-area">
         <Topbar role={props.role} roomState={props.roomState} nickname={props.nickname} connectionStatus={props.connectionStatus} />
-        <VideoArea role={props.role} connectionStatus={props.connectionStatus} selfVideoRef={props.selfVideoRef} remoteVideoRef={props.remoteVideoRef} />
+        <VideoArea role={props.role} connectionStatus={props.connectionStatus} selfVideoRef={props.selfVideoRef} remoteVideoRef={props.remoteVideoRef} messages={props.chatMessages} />
         <ControlBar role={props.role} onStartStreaming={props.onStartStreaming} onStopStreaming={props.onStopStreaming} />
       </div>
       <ChatPanel

@@ -73,7 +73,16 @@ export default function App() {
       else addToast(`正在观看 ${d.streamerNickname}`);
     });
     s.on('room:state', (st: RoomState) => setRoomState(st));
-    s.on('viewer:joined', (d: { nickname: string }) => addToast(`${d.nickname} 加入了房间`));
+    s.on('viewer:joined', (d: { nickname: string }) => {
+      addToast(`${d.nickname} 加入了房间`);
+      setChatMessages((prev) => [...prev, {
+        id: `sys-${Date.now()}`,
+        nickname: '📢 系统',
+        type: 'text' as const,
+        content: `🎉 ${d.nickname} 加入了直播间！`,
+        timestamp: Date.now(),
+      }].slice(-200));
+    });
     s.on('viewer:left', (d: { nickname: string }) => addToast(`${d.nickname} 离开了房间`));
     s.on('streamer:left', () => {
       setRole(null); setSocket(null);
