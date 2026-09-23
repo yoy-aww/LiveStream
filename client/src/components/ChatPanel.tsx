@@ -5,16 +5,18 @@ interface Props {
   messages: ChatMessage[];
   onSendChat: (text: string) => void;
   onSendImage: (url: string) => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
-export default function ChatPanel({ messages, onSendChat, onSendImage }: Props) {
+export default function ChatPanel({ messages, onSendChat, onSendImage, collapsed, onToggle }: Props) {
   const [text, setText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!collapsed) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, collapsed]);
 
   const handleSend = () => {
     if (text.trim()) {
@@ -44,9 +46,25 @@ export default function ChatPanel({ messages, onSendChat, onSendImage }: Props) 
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // 折叠状态：只显示一个窄条
+  if (collapsed) {
+    return (
+      <div className="chat-panel collapsed">
+        <button className="chat-toggle-bar" onClick={onToggle}>
+          <span className="chat-toggle-icon">💬</span>
+          <span className="chat-toggle-text">聊天</span>
+          {messages.length > 0 && <span className="chat-toggle-count">{messages.length}</span>}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-panel">
-      <div className="chat-header">💬 弹幕聊天</div>
+      <div className="chat-header">
+        <span className="chat-header-title">💬 弹幕聊天</span>
+        <button className="chat-collapse-btn" onClick={onToggle} title="收起聊天">✕</button>
+      </div>
       <div className="chat-messages">
         {messages.map((msg) => (
           <div key={`${msg.timestamp}-${msg.id}`} className="chat-msg">

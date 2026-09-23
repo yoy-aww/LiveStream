@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import type { RefObject } from 'react';
 import type { ChatMessage, RoomState, Role, ConnectionStatus } from '../types';
 import Topbar from './Topbar';
@@ -23,6 +24,8 @@ interface Props {
 }
 
 export default function LiveRoom(props: Props) {
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+
   return (
     <div className="live-room">
       <div className="main-area">
@@ -30,7 +33,13 @@ export default function LiveRoom(props: Props) {
         <VideoArea role={props.role} connectionStatus={props.connectionStatus} selfVideoRef={props.selfVideoRef} remoteVideoRef={props.remoteVideoRef} />
         <ControlBar role={props.role} onStartStreaming={props.onStartStreaming} onStopStreaming={props.onStopStreaming} />
       </div>
-      <ChatPanel messages={props.chatMessages} onSendChat={props.onSendChat} onSendImage={props.onSendImage} />
+      <ChatPanel
+        messages={props.chatMessages}
+        onSendChat={props.onSendChat}
+        onSendImage={props.onSendImage}
+        collapsed={chatCollapsed}
+        onToggle={() => setChatCollapsed(!chatCollapsed)}
+      />
       <ToastContainer toasts={props.toasts} />
     </div>
   );
