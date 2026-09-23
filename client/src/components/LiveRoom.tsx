@@ -5,6 +5,7 @@ import Topbar from './Topbar';
 import VideoArea from './VideoArea';
 import Danmaku from './Danmaku';
 import ChatPanel from './ChatPanel';
+import ViewerWall from './ViewerWall';
 import ControlBar from './ControlBar';
 import ToastContainer from './ToastContainer';
 
@@ -20,6 +21,8 @@ interface Props {
   remoteVideoRef: RefObject<HTMLVideoElement>;
   onSendChat: (text: string) => void;
   onSendImage: (url: string) => void;
+  wallMessages: import('../types').WallMessage[];
+  onSendWall: (content: string, emoji: string) => void;
   onStartStreaming: () => void;
   onStopStreaming: () => void;
 }
@@ -42,6 +45,10 @@ export default function LiveRoom(props: Props) {
         onSendImage={props.onSendImage}
         collapsed={chatCollapsed}
         onToggle={() => setChatCollapsed(!chatCollapsed)}
+      />
+      <ViewerWall
+        messages={props.wallMessages}
+        onSend={props.onSendWall}
       />
       <ToastContainer toasts={props.toasts} />
     </div>

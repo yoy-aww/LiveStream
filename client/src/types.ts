@@ -6,6 +6,14 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface WallMessage {
+  id: string;
+  nickname: string;
+  content: string;
+  emoji: string;
+  timestamp: number;
+}
+
 export interface RoomState {
   streamer: { nickname: string } | null;
   viewers: number;

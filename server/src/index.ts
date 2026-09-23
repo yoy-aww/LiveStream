@@ -97,6 +97,26 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 上墙
+  socket.on('wall:send', (data: { content: string; emoji: string }) => {
+    const now = Date.now();
+    let history = chatHistory.get(socket.id) || [];
+    history = history.filter(t => now - t < RATE_LIMIT_WINDOW);
+    if (history.length >= RATE_LIMIT_MAX) {
+      return socket.emit('chat:rateLimited');
+    }
+    history.push(now);
+    chatHistory.set(socket.id, history);
+    const msg = {
+      id: `${socket.id}-${now}`,
+      nickname,
+      content: (data.content || '').slice(0, 50),
+      emoji: (data.emoji || '❤️').slice(0, 2),
+      timestamp: now,
+    };
+    io.emit('wall:new', msg);
+  });
+
   // 聊天
   socket.on('chat:send', (data: { type: 'text' | 'image'; content: string }) => {
     const now = Date.now();

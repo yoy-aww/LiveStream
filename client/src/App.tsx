@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { ChatMessage, RoomState, Role, ConnectionStatus, AnswerPayload, IceAnswerPayload } from './types';
+import type { ChatMessage, RoomState, Role, ConnectionStatus, AnswerPayload, IceAnswerPayload, WallMessage } from './types';
 import LoginScreen from './components/LoginScreen';
 import LiveRoom from './components/LiveRoom';
 
@@ -43,6 +43,7 @@ export default function App() {
   const [role, setRole] = useState<Role>(null);
   const [roomState, setRoomState] = useState<RoomState>({ streamer: null, viewers: 0, streaming: false });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [wallMessages, setWallMessages] = useState<WallMessage[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
 
@@ -91,6 +92,7 @@ export default function App() {
       addToast('主播已离开');
     });
     s.on('chat:new', (msg: ChatMessage) => setChatMessages((prev) => [...prev, msg].slice(-200)));
+    s.on('wall:new', (msg: WallMessage) => setWallMessages((prev) => [...prev, msg].slice(-20)));
     s.on('chat:rateLimited', () => addToast('发送太频繁，请稍候'));
 
     setSocket(s);
@@ -293,6 +295,10 @@ export default function App() {
     if (socket && text.trim()) socket.emit('chat:send', { type: 'text', content: text.trim() });
   }, [socket]);
 
+  const sendWall = useCallback((content: string, emoji: string) => {
+    if (socket) socket.emit('wall:send', { content, emoji });
+  }, [socket]);
+
   const sendImage = useCallback((url: string) => {
     if (socket && url) socket.emit('chat:send', { type: 'image', content: url });
   }, [socket]);
@@ -308,6 +314,7 @@ export default function App() {
       connectionStatus={connectionStatus}
       selfVideoRef={selfVideoRef} remoteVideoRef={remoteVideoRef}
       onSendChat={sendChat} onSendImage={sendImage}
+      wallMessages={wallMessages} onSendWall={sendWall}
       onStartStreaming={startStreaming} onStopStreaming={stopStreaming}
     />
   );
